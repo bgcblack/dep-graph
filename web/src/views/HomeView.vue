@@ -1,9 +1,9 @@
-<script setup lang="ts">
-import TheWelcome from '../components/TheWelcome.vue'
-</script>
-
 <template>
   <main>
-    <TheWelcome />
+    <DependencyGraph />
   </main>
 </template>
+
+<script setup lang="ts">
+import DependencyGraph from '../components/DependencyGraph.vue'
+</script>
