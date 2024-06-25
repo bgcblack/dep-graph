@@ -1,65 +1,142 @@
 <template>
-  <div class="dependency-analyzer">
-    <el-input v-model="packageName" placeholder="输入依赖包名称"></el-input>
-    <el-button type="primary" @click="fetchDependencyGraph"
-      >查询依赖关系</el-button
-    >
-    <div ref="graphContainer" class="dependency-graph"></div>
-  </div>
+  <el-card class="dependency-graph-card">
+    <!-- 定义一个 SVG 元素用于渲染依赖关系图 -->
+    <svg ref="graph"></svg>
+  </el-card>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref } from 'vue'
-import axios from 'axios' // 使用 axios 发送 HTTP 请求
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import * as d3 from 'd3'
+import 'element-plus/dist/index.css'
+import { getDepGraphNode, test } from '../api/graph'
+// 定义依赖关系节点的接口
+interface DepGraphNode {
+  name: string
+  external: boolean
+  dependencies: { name: string; version: string; depType: string }[]
+}
 
-export default defineComponent({
-  name: 'DependencyAnalyzer',
-  setup() {
-    const packageName = ref('')
-    const dependencyData = ref(null)
-    const error = ref(null)
-    const graphContainer = ref(null)
+// 定义扩展节点类型以包含 D3 模拟的属性
+interface SimulationNodeDatum extends d3.SimulationNodeDatum {
+  id: string
+  fx?: number | null
+  fy?: number | null
+}
 
-    const fetchDependencyGraph = async () => {
-      try {
-        const response = await axios.post('/api/analyze-dependencies', {
-          packageName: packageName.value,
+const graph = ref<SVGSVGElement | null>(null) // 获取 SVG 元素的引用
+test()
+// 异步函数，获取依赖关系图数据
+const getDependencyGraph = async (): Promise<DepGraphNode[]> => {
+  const response = await getDepGraphNode()
+  return response.json()
+}
+
+// 使用 D3.js 渲染依赖关系图
+const renderGraph = (data: DepGraphNode[]) => {
+  if (!graph.value) return
+
+  const width = 800
+  const height = 600
+
+  const svg = d3.select(graph.value).attr('width', width).attr('height', height)
+
+  const nodes: SimulationNodeDatum[] = data.map((d) => ({ id: d.name }))
+
+  // 使用 map 和 reduce 代替 flatMap
+  const links = data
+    .map((d) =>
+      d.dependencies.map((dep) => ({ source: d.name, target: dep.name })),
+    )
+    .reduce((acc, val) => acc.concat(val), [])
+
+  const simulation = d3
+    .forceSimulation(nodes)
+    .force(
+      'link',
+      d3.forceLink(links).id((d) => (d as any).id),
+    )
+    .force('charge', d3.forceManyBody().strength(-200))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+
+  svg
+    .append('defs')
+    .append('marker')
+    .attr('id', 'arrow')
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 15)
+    .attr('refY', 0)
+    .attr('markerWidth', 6)
+    .attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-5L10,0L0,5')
+    .attr('fill', '#999')
+
+  const link = svg
+    .append('g')
+    .attr('class', 'links')
+    .selectAll('line')
+    .data(links)
+    .enter()
+    .append('line')
+    .attr('stroke', '#999')
+    .attr('stroke-opacity', 0.6)
+    .attr('stroke-width', 1.5)
+    .attr('marker-end', 'url(#arrow)')
+
+  const node = svg
+    .append('g')
+    .attr('class', 'nodes')
+    .selectAll('circle')
+    .data(nodes)
+    .enter()
+    .append('circle')
+    .attr('r', 5)
+    .attr('fill', 'blue')
+    .call(
+      d3
+        .drag<SVGCircleElement, SimulationNodeDatum>()
+        .on('start', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0.3).restart()
+          d.fx = d.x
+          d.fy = d.y
         })
-        dependencyData.value = response.data
-        renderGraph()
-      } catch (error) {
-        error.value = '获取依赖数据时出错'
-        console.error('Error fetching dependency data:', error)
-      }
-    }
+        .on('drag', (event, d) => {
+          d.fx = event.x
+          d.fy = event.y
+        })
+        .on('end', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0)
+          d.fx = null
+          d.fy = null
+        }),
+    )
 
-    const renderGraph = () => {
-      if (dependencyData.value) {
-        // 在这里使用 D3.js 或其他可视化库渲染图表
-        // 示例代码：
-        // const graph = new Graph(graphContainer.value, dependencyData.value);
-        // graph.render();
-      }
-    }
+  node.append('title').text((d) => d.id)
 
-    return {
-      packageName,
-      fetchDependencyGraph,
-      graphContainer,
-    }
-  },
+  simulation.on('tick', () => {
+    link
+      .attr('x1', (d) => (d as any).source.x)
+      .attr('y1', (d) => (d as any).source.y)
+      .attr('x2', (d) => (d as any).target.x)
+      .attr('y2', (d) => (d as any).target.y)
+
+    node.attr('cx', (d) => d.x!).attr('cy', (d) => d.y!)
+  })
+}
+
+// 组件挂载后，获取依赖数据并渲染图表
+onMounted(async () => {
+  const data = await getDependencyGraph()
+  renderGraph(data)
 })
 </script>
 
 <style scoped>
-.dependency-analyzer {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-}
-.dependency-graph {
-  margin-top: 20px;
-  height: 400px;
-  border: 1px solid #ccc;
+.dependency-graph-card {
+  width: 100%;
+  height: 600px;
+  overflow: hidden;
 }
 </style>
