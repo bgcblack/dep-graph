@@ -6,9 +6,9 @@ type DepTypes = 'dev' | 'prod' | 'peer'
 
 // 定义依赖关系节点
 interface DepGraphNode {
-  name: string // 包名
-  external: boolean // 是否为外部依赖
-  dependencies: { name: string; version: string; depType: DepTypes }[] // 包依赖列表
+  name: string 
+  external: boolean 
+  dependencies: { name: string; version: string; depType: DepTypes }[]
 }
 
 // 定义依赖关系图
@@ -21,6 +21,7 @@ const getDepGraphNode = (
   depType: DepTypes,
   dependencies: any
 ): DepGraphNode => {
+  debugger;
   console.log(dependencies, '==========================1')
   const packageKey = `${name}@${version}` // 拼接包名和版本号
   console.log(packageKey, '==========================2')
