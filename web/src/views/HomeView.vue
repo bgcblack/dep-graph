@@ -22,7 +22,27 @@ interface DepGraphNode {
   dependencies: DepGraphNode[]
 }
 
-const dependencyData = ref<DepGraphNode[]>([])
+const dependencyData = ref<DepGraphNode[]>([
+  {
+    name: "Node 1",
+    version: "1.0.0",
+    external: false,
+    dependencies: [
+      {
+        name: "Node 2",
+        version: "1.0.0",
+        external: false,
+        dependencies: []
+      },
+      {
+        name: "Node 3",
+        version: "1.0.0",
+        external: false,
+        dependencies: []
+      }
+    ]
+  }
+])
 
 test()
 // 异步函数，获取依赖关系图数据
@@ -34,9 +54,9 @@ const getDependencyGraph = async (): Promise<DepGraphNode[]> => {
 
 onMounted(() => {
   // 确保组件挂载后再进行渲染
-  getDependencyGraph().then((res) => {
-    dependencyData.value = res
-  })
+  // getDependencyGraph().then((res) => {
+  //   dependencyData.value = res
+  // })
 })
 </script>
 
