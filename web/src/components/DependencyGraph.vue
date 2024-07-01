@@ -1,77 +1,67 @@
 <template>
-  <el-card class="dependency-graph-card">
-    <!-- 定义一个 SVG 元素用于渲染依赖关系图 -->
-    <svg ref="graph"></svg>
-  </el-card>
+  <div ref="graph"></div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, onMounted, watchEffect } from 'vue'
 import * as d3 from 'd3'
-import 'element-plus/dist/index.css'
-import { getDepGraphNode, test } from '../api/graph'
-// 定义依赖关系节点的接口
-interface DepGraphNode {
-  name: string
-  external: boolean
-  dependencies: { name: string; version: string; depType: string }[]
-}
 
-// 定义扩展节点类型以包含 D3 模拟的属性
-interface SimulationNodeDatum extends d3.SimulationNodeDatum {
+interface DepGraphNode extends d3.SimulationNodeDatum {
   id: string
-  fx?: number | null
-  fy?: number | null
+  name: string
+  version: string
+  external: boolean
+  dependencies: DepGraphNode[]
 }
 
-const graph = ref<SVGSVGElement | null>(null) // 获取 SVG 元素的引用
-test()
-// 异步函数，获取依赖关系图数据
-const getDependencyGraph = async (): Promise<DepGraphNode[]> => {
-  const response = await getDepGraphNode()
-  return response.json()
+interface Link extends d3.SimulationLinkDatum<DepGraphNode> {
+  source: DepGraphNode
+  target: DepGraphNode
 }
 
-// 使用 D3.js 渲染依赖关系图
-const renderGraph = (data: DepGraphNode[]) => {
-  if (!graph.value) return
+const props = defineProps<{
+  data: DepGraphNode[]
+}>()
 
+const graph = ref<HTMLElement | null>(null)
+
+const createGraph = (data: DepGraphNode[]) => {
   const width = 800
   const height = 600
 
-  const svg = d3.select(graph.value).attr('width', width).attr('height', height)
-
-  const nodes: SimulationNodeDatum[] = data.map((d) => ({ id: d.name }))
-
-  // 使用 map 和 reduce 代替 flatMap
-  const links = data
-    .map((d) =>
-      d.dependencies.map((dep) => ({ source: d.name, target: dep.name })),
-    )
-    .reduce((acc, val) => acc.concat(val), [])
+  const svg = d3
+    .select(graph.value)
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height)
 
   const simulation = d3
-    .forceSimulation(nodes)
+    .forceSimulation<DepGraphNode>()
     .force(
       'link',
-      d3.forceLink(links).id((d) => (d as any).id),
+      d3.forceLink<DepGraphNode, Link>().id((d: DepGraphNode) => d.id),
     )
-    .force('charge', d3.forceManyBody().strength(-200))
+    .force('charge', d3.forceManyBody())
     .force('center', d3.forceCenter(width / 2, height / 2))
 
-  svg
-    .append('defs')
-    .append('marker')
-    .attr('id', 'arrow')
-    .attr('viewBox', '0 -5 10 10')
-    .attr('refX', 15)
-    .attr('refY', 0)
-    .attr('markerWidth', 6)
-    .attr('markerHeight', 6)
-    .attr('orient', 'auto')
-    .append('path')
-    .attr('d', 'M0,-5L10,0L0,5')
-    .attr('fill', '#999')
+  const flattenDependencies = (node: DepGraphNode): DepGraphNode[] => {
+    return [
+      node,
+      ...node.dependencies.flatMap((dep) => flattenDependencies(dep)),
+    ]
+  }
+
+  const nodes = data.flatMap((d: DepGraphNode) => flattenDependencies(d))
+  nodes.forEach((node) => {
+    node.id = `${node.name}@${node.version}`
+  })
+
+  const links: Link[] = nodes.flatMap((node) =>
+    node.dependencies.map((dep) => ({
+      source: node,
+      target: dep,
+    })),
+  )
 
   const link = svg
     .append('g')
@@ -80,10 +70,7 @@ const renderGraph = (data: DepGraphNode[]) => {
     .data(links)
     .enter()
     .append('line')
-    .attr('stroke', '#999')
-    .attr('stroke-opacity', 0.6)
-    .attr('stroke-width', 1.5)
-    .attr('marker-end', 'url(#arrow)')
+    .attr('stroke-width', 1)
 
   const node = svg
     .append('g')
@@ -93,10 +80,9 @@ const renderGraph = (data: DepGraphNode[]) => {
     .enter()
     .append('circle')
     .attr('r', 5)
-    .attr('fill', 'blue')
     .call(
       d3
-        .drag<SVGCircleElement, SimulationNodeDatum>()
+        .drag<SVGCircleElement, DepGraphNode>()
         .on('start', (event, d) => {
           if (!event.active) simulation.alphaTarget(0.3).restart()
           d.fx = d.x
@@ -115,28 +101,36 @@ const renderGraph = (data: DepGraphNode[]) => {
 
   node.append('title').text((d) => d.id)
 
-  simulation.on('tick', () => {
+  simulation.nodes(nodes).on('tick', () => {
     link
-      .attr('x1', (d) => (d as any).source.x)
-      .attr('y1', (d) => (d as any).source.y)
-      .attr('x2', (d) => (d as any).target.x)
-      .attr('y2', (d) => (d as any).target.y)
+      .attr('x1', (d: any) => (d.source.x !== undefined ? d.source.x : 0))
+      .attr('y1', (d: any) => (d.source.y !== undefined ? d.source.y : 0))
+      .attr('x2', (d: any) => (d.target.x !== undefined ? d.target.x : 0))
+      .attr('y2', (d: any) => (d.target.y !== undefined ? d.target.y : 0))
 
-    node.attr('cx', (d) => d.x!).attr('cy', (d) => d.y!)
+    node
+      .attr('cx', (d: any) => (d.x !== undefined ? d.x : 0))
+      .attr('cy', (d: any) => (d.y !== undefined ? d.y : 0))
   })
+  simulation.force<d3.ForceLink<DepGraphNode, Link>>('link')!.links(links)
 }
+watchEffect(() => {
+  // createGraph(props.data)
+})
 
-// 组件挂载后，获取依赖数据并渲染图表
-onMounted(async () => {
-  const data = await getDependencyGraph()
-  renderGraph(data)
+onMounted(() => {
+  createGraph(props.data)
 })
 </script>
 
 <style scoped>
-.dependency-graph-card {
-  width: 100%;
-  height: 600px;
-  overflow: hidden;
+.links line {
+  stroke: #999;
+  stroke-opacity: 0.6;
+}
+
+.nodes circle {
+  stroke: #fff;
+  stroke-width: 1.5px;
 }
 </style>

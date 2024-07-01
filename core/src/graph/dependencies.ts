@@ -1,70 +1,126 @@
-import { promises as fs } from 'fs'
 import path from 'path'
-import { readWantedLockfile } from '@pnpm/lockfile-file'
+import {
+  readWantedLockfile,
+  type PackageSnapshot,
+  type Lockfile,
+} from '@pnpm/lockfile-file'
+
 // 定义依赖类型
 type DepTypes = 'dev' | 'prod' | 'peer'
 
 // 定义依赖关系节点
 interface DepGraphNode {
-  name: string 
-  external: boolean 
-  dependencies: { name: string; version: string; depType: DepTypes }[]
+  name: string
+  version: string
+  external: boolean
+  dependencies: DepGraphNode[]
 }
 
-// 定义依赖关系图
+// 定义依赖关系
 type DepGraph = DepGraphNode[]
+
+const parseFromSpecify = (specifier: string) => {
+  const REGEXP = /(@?[\w\-\d\.]+(\/[\w\-\d\.]+)?)@?([\d\w\.\-]+)?/
+  if (!REGEXP.test(specifier)) {
+    throw new Error(`Can not parse this key: ${specifier}`)
+  }
+  const [, name, , version] = REGEXP.exec(specifier)!
+
+  return {
+    name,
+    specifier,
+    localVersion: version, // 使用version代替localVersion，因为我们只捕获了一个版本号
+    version, // 并且直接提供version字段
+  }
+}
 
 // 获取依赖关系节点
 const getDepGraphNode = (
   name: string,
   version: string,
   depType: DepTypes,
-  dependencies: any
+  packages: Record<string, PackageSnapshot>,
+  currentDepth: number,
+  maxDepth: number,
+  packageKey: string
 ): DepGraphNode => {
-  debugger;
-  console.log(dependencies, '==========================1')
-  const packageKey = `${name}@${version}` // 拼接包名和版本号
-  console.log(packageKey, '==========================2')
-  const packageInfo = dependencies[packageKey] // 获取包信息
+  const packageInfo = packages[packageKey] // 获取包信息
 
-  // 获取包的依赖列表，确保版本是字符串类型
-  const deps = Object.entries(packageInfo.dependencies || {}).map(
-    ([depName, depVersion]) => ({
-      name: depName,
-      version: depVersion as string,
-      depType: depType,
-    })
-  )
+  if (!packageInfo) {
+    return {
+      name,
+      version,
+      external: true,
+      dependencies: [],
+    }
+  }
+
+  // 获取包的依赖列表，并确保递归深度限制
+  const deps: DepGraphNode[] =
+    currentDepth < maxDepth
+      ? Object.entries(packageInfo.dependencies || {}).map(
+          ([depName, depVersion]) => {
+            const { name, version } = parseFromSpecify(depName)
+            return getDepGraphNode(
+              name,
+              depVersion as string,
+              depType,
+              packages,
+              currentDepth + 1,
+              maxDepth,
+              depName + '@' + depVersion
+            )
+          }
+        )
+      : []
 
   return {
-    name: name,
-    external: packageInfo.resolution.type === 'tarball', // 判断是否为外部依赖
+    name,
+    version,
+    external: !!packageInfo.resolution && 'type' in packageInfo.resolution, // 判断是否为外部依赖
     dependencies: deps,
   }
 }
 
-// 生成依赖关系图
-const generateDepGraph = async (filePath: string): Promise<DepGraph> => {
-  const lockfile = await readWantedLockfile(path.dirname(filePath), {
-    ignoreIncompatible: false,
-  })
-  if (!lockfile) throw new Error('Failed to read lockfile')
-
-  const { packages } = lockfile
-
-  // 生成依赖关系图
-  const depGraph: DepGraph = Object.entries(packages!).map(
-    ([packageKey, packageInfo]: [string, any]) => {
-      const [name, version] = packageKey.split('/')
-      const depType: DepTypes = packageInfo.dev
-        ? 'dev'
-        : packageInfo.peer
-        ? 'peer'
-        : 'prod' // 确定依赖类型
-
-      return getDepGraphNode(name, version, depType, packages) // 获取依赖关系节点
+// 生成依赖关系
+const generateDepGraph = async (
+  filePath: string,
+  maxDepth: number
+): Promise<DepGraph> => {
+  const lockfile: Lockfile | null = await readWantedLockfile(
+    path.dirname(filePath),
+    {
+      ignoreIncompatible: false,
     }
   )
+  if (!lockfile) throw new Error('Failed to read lockfile')
+
+  const packages = lockfile.packages as Record<string, PackageSnapshot>
+
+  if (!packages) {
+    throw new Error('No packages found in lockfile')
+  }
+
+  const depGraph: DepGraph = Object.entries(packages).map((keys) => {
+    const [packageKey, packageInfo] = keys
+    const { name, version } = parseFromSpecify(packageKey)
+    const depType: DepTypes =
+      'peerDependencies' in packageInfo
+        ? 'peer'
+        : 'devDependencies' in packageInfo
+        ? 'dev'
+        : 'prod' // 确定依赖类型
+
+    return getDepGraphNode(
+      name,
+      version,
+      depType,
+      packages,
+      0,
+      maxDepth,
+      packageKey
+    ) // 获取依赖关系节点并控制递归深度
+  })
 
   return depGraph
 }
