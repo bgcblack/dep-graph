@@ -3,129 +3,140 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watchEffect } from 'vue'
 import * as d3 from 'd3'
+import { transformData } from '../utils/utils'
 
-interface DepGraphNode extends d3.SimulationNodeDatum {
-  id: string
+interface Dependency {
   name: string
   version: string
   external: boolean
-  dependencies: DepGraphNode[]
-  parentId?: string
+  dependencies: Dependency[]
 }
 
-interface Link extends d3.SimulationLinkDatum<DepGraphNode> {
-  source: string | DepGraphNode
-  target: string | DepGraphNode
+interface NodeItem extends d3.SimulationNodeDatum {
+  id: string
 }
 
-const props = defineProps<{
-  data: DepGraphNode[]
-}>()
+interface LinkItem extends d3.SimulationLinkDatum<NodeItem> {
+  source: string
+  target: string
+}
+
+interface GraphData {
+  nodes: NodeItem[]
+  links: LinkItem[]
+}
+
+const props = defineProps<{ data: Dependency[] }>()
 
 const graph = ref<HTMLElement | null>(null)
+let simulation: d3.Simulation<d3.SimulationNodeDatum, undefined>
 
-const createGraph = (data: DepGraphNode[]) => {
+const createGraph = (data: GraphData) => {
   const width = 800
   const height = 600
 
+  // 清理旧图表
   d3.select(graph.value).selectAll('*').remove()
+
+  const zoom = d3
+    .zoom()
+    .scaleExtent([1, 10])
+    .on('zoom', (d3: any) => zoomed(d3))
 
   const svg = d3
     .select(graph.value)
     .append('svg')
     .attr('width', width)
     .attr('height', height)
+    .call(zoom as d3.ZoomBehavior<any, any>)
 
-  const simulation = d3
-    .forceSimulation<DepGraphNode>()
-    .force('link', d3.forceLink<DepGraphNode, Link>().id((d) => d.id).distance(100))
-    .force('charge', d3.forceManyBody().strength(-200))
+  simulation = d3
+    .forceSimulation(data.nodes as any)
+    .force(
+      'link',
+      d3.forceLink(data.links).id((d: any) => d.id),
+    )
+    .force('charge', d3.forceManyBody())
     .force('center', d3.forceCenter(width / 2, height / 2))
-
-  const flattenDependencies = (node: DepGraphNode, parentId: string | null = null): DepGraphNode[] => {
-    const nodes: DepGraphNode[] = [{ ...node, parentId }]
-    node.dependencies.forEach((dep) => {
-      nodes.push(...flattenDependencies(dep, node.id))
-    })
-    return nodes
-  }
-
-  const nodes = data.flatMap((d) => flattenDependencies(d))
-  console.log("Flattened Nodes:", nodes)
-
-  const links: Link[] = nodes.flatMap((node) =>
-    node.dependencies.map((dep) => ({
-      source: node.id,
-      target: dep.id
-    }))
-  )
-  console.log("Links:", links)
 
   const link = svg
     .append('g')
     .attr('class', 'links')
     .selectAll('line')
-    .data(links)
+    .data(data.links)
     .enter()
     .append('line')
-    .attr('stroke-width', 1)
+    .attr('stroke-width', 2)
     .attr('stroke', '#999')
 
   const node = svg
     .append('g')
     .attr('class', 'nodes')
     .selectAll('circle')
-    .data(nodes)
+    .data(data.nodes)
     .enter()
     .append('circle')
     .attr('r', 5)
-    .attr('fill', 'blue')
-    .call(
-      d3.drag<SVGCircleElement, DepGraphNode>()
-        .on('start', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0.3).restart()
-          d.fx = event.x
-          d.fy = event.y
-        })
-        .on('drag', (event, d) => {
-          d.fx = event.x
-          d.fy = event.y
-        })
-        .on('end', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0)
-          d.fx = null
-          d.fy = null
-        }),
-    )
+    .attr('fill', '#69b3a2')
+    .call(drag)
 
-  node.append('title').text((d) => d.id)
+  node.append('title').text((d: any) => d.id)
 
-  simulation.nodes(nodes).on('tick', () => {
+  simulation.on('tick', () => {
     link
-      .attr('x1', (d: any) => (d.source as DepGraphNode).x ?? 0)
-      .attr('y1', (d: any) => (d.source as DepGraphNode).y ?? 0)
-      .attr('x2', (d: any) => (d.target as DepGraphNode).x ?? 0)
-      .attr('y2', (d: any) => (d.target as DepGraphNode).y ?? 0)
+      .attr('x1', (d: any) => d.source.x)
+      .attr('y1', (d: any) => d.source.y)
+      .attr('x2', (d: any) => d.target.x)
+      .attr('y2', (d: any) => d.target.y)
 
-    node.attr('cx', (d: any) => d.x ?? 0).attr('cy', (d: any) => d.y ?? 0)
+    node.attr('cx', (d: any) => d.x).attr('cy', (d: any) => d.y)
   })
 
-  ;(simulation.force<d3.ForceLink<DepGraphNode, Link>>('link')!).links(links)
+  function zoomed(event: any) {
+    const transform = event.transform
+    link.attr('transform', transform)
+    node.attr('transform', transform)
+  }
+}
+
+const drag = () => {
+  const dragstarted = (event: any) => {
+    if (!event.active) simulation.alphaTarget(0.3).restart()
+    event.subject.fx = event.subject.x
+    event.subject.fy = event.subject.y
+  }
+
+  const dragged = (event: any) => {
+    event.subject.fx = event.x
+    event.subject.fy = event.y
+  }
+
+  const dragended = (event: any) => {
+    if (!event.active) simulation.alphaTarget(0)
+    event.subject.fx = null
+    event.subject.fy = null
+  }
+
+  return d3
+    .drag()
+    .on('start', dragstarted)
+    .on('drag', dragged)
+    .on('end', dragended)
 }
 
 onMounted(() => {
-  createGraph(props.data)
+  const graphData = transformData(props.data)
+  createGraph(graphData)
 })
 
-watch(
-  () => props.data,
-  (newData) => {
-    createGraph(newData)
-  },
-  { deep: true }
-)
+watchEffect(() => {
+  if (props.data) {
+    const graphData = transformData(props.data)
+    createGraph(graphData)
+  }
+})
 </script>
 
 <style scoped>
@@ -139,4 +150,3 @@ watch(
   stroke-width: 1.5px;
 }
 </style>
- 
