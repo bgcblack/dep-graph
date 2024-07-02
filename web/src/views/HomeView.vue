@@ -14,18 +14,12 @@ import DependencyGraph from '@/components/DependencyGraph.vue'
 import 'element-plus/dist/index.css'
 import { ref, onMounted } from 'vue'
 import { getDepGraphNode, test } from '../api/graph'
+import  { type DepGraphNode}  from '../types/graph'
 
-interface DepGraphNode {
-  name: string
-  version: string
-  external: boolean
-  dependencies: DepGraphNode[]
-}
 
 const dependencyData = ref<DepGraphNode[]>([])
 
-test()
-// 异步函数，获取依赖关系图数据
+// 获取依赖关系图数据
 const getDependencyGraph = async (): Promise<DepGraphNode[]> => {
   const response = await getDepGraphNode()
   dependencyData.value = response.data
@@ -33,7 +27,6 @@ const getDependencyGraph = async (): Promise<DepGraphNode[]> => {
 }
 
 onMounted(() => {
-  // 确保组件挂载后再进行渲染
   getDependencyGraph()
 })
 </script>

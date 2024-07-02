@@ -1,18 +1,22 @@
-type DepTypes = 'dev' | 'prod' | 'peer'
+import * as d3 from 'd3'
 
 export interface DepGraphNode {
-  /**
-   * 包名
-   */
   name: string
-  /**
-   * 标识该 package 是否为外部依赖
-   */
+  version: string
   external: boolean
-  /**
-   * 包依赖列表
-   */
-  dependencies: { name: string; version: string; depType: DepTypes }[]
+  dependencies: DepGraphNode[]
 }
 
-export type DepGraph = DepGraphNode[]
+export interface NodeItem extends d3.SimulationNodeDatum {
+  id: string
+}
+
+export interface LinkItem extends d3.SimulationLinkDatum<NodeItem> {
+  source: string
+  target: string
+}
+
+export interface GraphData {
+  nodes: NodeItem[]
+  links: LinkItem[]
+}

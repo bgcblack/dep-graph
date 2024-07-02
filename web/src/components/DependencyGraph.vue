@@ -6,29 +6,9 @@
 import { ref, onMounted, watchEffect } from 'vue'
 import * as d3 from 'd3'
 import { transformData } from '../utils/utils'
+import { type DepGraphNode, type NodeItem, type LinkItem , type GraphData} from '../types/graph'
 
-interface Dependency {
-  name: string
-  version: string
-  external: boolean
-  dependencies: Dependency[]
-}
-
-interface NodeItem extends d3.SimulationNodeDatum {
-  id: string
-}
-
-interface LinkItem extends d3.SimulationLinkDatum<NodeItem> {
-  source: string
-  target: string
-}
-
-interface GraphData {
-  nodes: NodeItem[]
-  links: LinkItem[]
-}
-
-const props = defineProps<{ data: Dependency[] }>()
+const props = defineProps<{ data: DepGraphNode[] }>()
 
 const graph = ref<HTMLElement | null>(null)
 let simulation: d3.Simulation<d3.SimulationNodeDatum, undefined>
