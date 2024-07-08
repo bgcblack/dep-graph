@@ -4,20 +4,8 @@ import {
   type PackageSnapshot,
   type Lockfile,
 } from '@pnpm/lockfile-file'
-
-// 定义依赖类型
-type DepTypes = 'dev' | 'prod' | 'peer'
-
-// 定义依赖关系节点
-interface DepGraphNode {
-  name: string
-  version: string
-  external: boolean
-  dependencies: DepGraphNode[]
-}
-
-// 定义依赖关系
-type DepGraph = DepGraphNode[]
+import { type DepTypes, type DepGraphNode, type DepGraph } from '../types/index'
+import { BaseDepGraph } from './base' // 假设 BaseDepGraph 在同目录下
 
 const parseFromSpecify = (specifier: string) => {
   const REGEXP = /(@?[\w\-\d\.]+(\/[\w\-\d\.]+)?)@?([\d\w\.\-]+)?/
@@ -29,8 +17,8 @@ const parseFromSpecify = (specifier: string) => {
   return {
     name,
     specifier,
-    localVersion: version, // 使用version代替localVersion，因为我们只捕获了一个版本号
-    version, // 并且直接提供version字段
+    localVersion: version, // 使用 version 代替 localVersion，因为我们只捕获了一个版本号
+    version, // 并且直接提供 version 字段
   }
 }
 
@@ -82,47 +70,53 @@ const getDepGraphNode = (
   }
 }
 
-// 生成依赖关系
-const generateDepGraph = async (
-  filePath: string,
-  maxDepth: number
-): Promise<DepGraph> => {
-  const lockfile: Lockfile | null = await readWantedLockfile(
-    path.dirname(filePath),
-    {
-      ignoreIncompatible: false,
-    }
-  )
-  if (!lockfile) throw new Error('Failed to read lockfile')
+// 定义继承自 BaseDepGraph 的类
+export class PnpmDepGraph extends BaseDepGraph {
+  private filePath: string
+  private maxDepth: number
 
-  const packages = lockfile.packages as Record<string, PackageSnapshot>
-
-  if (!packages) {
-    throw new Error('No packages found in lockfile')
+  constructor(filePath: string, maxDepth: number) {
+    super()
+    this.filePath = filePath
+    this.maxDepth = maxDepth
   }
 
-  const depGraph: DepGraph = Object.entries(packages).map((keys) => {
-    const [packageKey, packageInfo] = keys
-    const { name, version } = parseFromSpecify(packageKey)
-    const depType: DepTypes =
-      'peerDependencies' in packageInfo
-        ? 'peer'
-        : 'devDependencies' in packageInfo
-        ? 'dev'
-        : 'prod' // 确定依赖类型
+  async parse(): Promise<DepGraph> {
+    const lockfile: Lockfile | null = await readWantedLockfile(
+      path.dirname(this.filePath),
+      {
+        ignoreIncompatible: false,
+      }
+    )
+    if (!lockfile) throw new Error('Failed to read lockfile')
 
-    return getDepGraphNode(
-      name,
-      version,
-      depType,
-      packages,
-      0,
-      maxDepth,
-      packageKey
-    ) // 获取依赖关系节点并控制递归深度
-  })
+    const packages = lockfile.packages as Record<string, PackageSnapshot>
 
-  return depGraph
+    if (!packages) {
+      throw new Error('No packages found in lockfile')
+    }
+
+    const depGraph: DepGraph = Object.entries(packages).map((keys) => {
+      const [packageKey, packageInfo] = keys
+      const { name, version } = parseFromSpecify(packageKey)
+      const depType: DepTypes =
+        'peerDependencies' in packageInfo
+          ? 'peer'
+          : 'devDependencies' in packageInfo
+          ? 'dev'
+          : 'prod' // 确定依赖类型
+
+      return getDepGraphNode(
+        name,
+        version,
+        depType,
+        packages,
+        0,
+        this.maxDepth,
+        packageKey
+      ) // 获取依赖关系节点并控制递归深度
+    })
+
+    return depGraph
+  }
 }
-
-export { generateDepGraph }

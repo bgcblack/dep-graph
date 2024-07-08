@@ -6,7 +6,12 @@
 import { ref, onMounted, watchEffect } from 'vue'
 import * as d3 from 'd3'
 import { transformData } from '../utils/utils'
-import { type DepGraphNode, type NodeItem, type LinkItem , type GraphData} from '../types/graph'
+import {
+  type DepGraphNode,
+  type NodeItem,
+  type LinkItem,
+  type GraphData,
+} from '../types/graph'
 
 const props = defineProps<{ data: DepGraphNode[] }>()
 
