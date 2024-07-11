@@ -3,20 +3,22 @@ import path from 'path'
 
 let app: express.Application
 
-export const startWebProject = (): void => {
+export const startWebProject = (data: any): void => {
   app = express()
   const port = 3000
 
   // 设置静态文件目录为Vue构建后的dist目录
-  const publicDir = path.join(__dirname, '../../../dist')
+  const publicDir = path.join(__dirname, '../../dist')
+
+  console.log(publicDir, 'publicDir')
+
   app.use(express.static(publicDir))
 
   app.use(express.json())
 
-  app.post('/render', (req, res) => {
-    const graphData = req.body
-    renderGraph(graphData)
-    res.send('Graph rendered successfully')
+  // 提供一个API接口获取graphData
+  app.get('/api/graph-data', (req, res) => {
+    res.json(data)
   })
 
   // 默认路由

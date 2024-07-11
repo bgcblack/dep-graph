@@ -9,7 +9,8 @@ export const useGraphStore = defineStore('graph', {
   actions: {
     async getGraphData() {
       try {
-        const response = await getDepGraphNode()
+        // const response = await getDepGraphNode()
+        const response = await fetch('/api/graph-data')
         const data = await response.json()
         this.graphData = data
       } catch (error) {

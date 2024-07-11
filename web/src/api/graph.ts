@@ -1,7 +1,7 @@
 import api from './server'
-import type { DepGraph } from '../types/graph'
+import { type GraphData } from '../types/graph'
 export const getDepGraphNode = async () => {
-  const res = await api.get<DepGraph>('/api/dependencies')
+  const res = await api.get<GraphData>('/api/dependencies')
   return res
 }
 export const test = async () => {
