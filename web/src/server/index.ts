@@ -1,5 +1,6 @@
 import express from 'express'
 import path from 'path'
+import open from 'open'
 
 let app: express.Application
 
@@ -29,6 +30,7 @@ export const startWebProject = (data: any): void => {
   app.listen(port, () => {
     console.log(`Web project is running at http://localhost:${port}`)
   })
+  open(`http://localhost:${port}`)
 }
 
 export const renderGraph = (graphData: any): void => {

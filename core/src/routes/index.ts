@@ -1,15 +1,8 @@
 import Router from 'koa-router'
-import { type Context } from 'koa'
-import { getDependenciesForYarm } from './dependencies'
+import { getDependenciesForPnpm } from './dependencies'
 
 const router = new Router()
-router.get('/test', async (ctx: Context) => {
-  ctx.body = {
-    code: 0,
-    message: 'testData',
-  }
-})
 
-router.get('/dependencies', getDependenciesForYarm)
+router.get('/dependencies', getDependenciesForPnpm)
 
 export default router

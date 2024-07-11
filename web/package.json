@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
-    "build2": "tsc",
     "preview": "vite preview",
-    "test:unit": "vitest",
     "build-only": "vite build",
     "type-check": "vue-tsc --build --force"
   },
@@ -18,7 +16,7 @@
     "element-plus": "^2.7.6",
     "express": "^4.19.2",
     "node-fetch": "^3.3.2",
-    "open": "^10.1.0",
+    "open": "8.4.2",
     "pinia": "^2.1.7",
     "vue": "^3.4.29",
     "vue-router": "^4.3.3"

@@ -5,7 +5,7 @@ import {
   type Lockfile,
 } from '@pnpm/lockfile-file'
 import { type DepTypes, type DepGraphNode, type DepGraph } from '../types/index'
-import { BaseDepGraph } from './base' // 假设 BaseDepGraph 在同目录下
+import { BaseDepGraph } from './base'
 
 const parseFromSpecify = (specifier: string) => {
   const REGEXP = /(@?[\w\-\d\.]+(\/[\w\-\d\.]+)?)@?([\d\w\.\-]+)?/
@@ -17,8 +17,8 @@ const parseFromSpecify = (specifier: string) => {
   return {
     name,
     specifier,
-    localVersion: version, // 使用 version 代替 localVersion，因为我们只捕获了一个版本号
-    version, // 并且直接提供 version 字段
+    localVersion: version,
+    version,
   }
 }
 
@@ -48,7 +48,7 @@ const getDepGraphNode = (
     currentDepth < maxDepth
       ? Object.entries(packageInfo.dependencies || {}).map(
           ([depName, depVersion]) => {
-            const { name, version } = parseFromSpecify(depName)
+            const { name } = parseFromSpecify(depName)
             return getDepGraphNode(
               name,
               depVersion as string,
@@ -104,7 +104,7 @@ export class PnpmDepGraph extends BaseDepGraph {
           ? 'peer'
           : 'devDependencies' in packageInfo
           ? 'dev'
-          : 'prod' // 确定依赖类型
+          : 'prod'
 
       return getDepGraphNode(
         name,

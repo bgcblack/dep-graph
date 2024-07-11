@@ -1,12 +1,16 @@
-import { PnpmDepGraph } from '../graph/dependencies'
+import { PnpmDepGraph } from '../graph/pnpm'
 import path from 'path'
 import { type Context } from 'koa'
 
-export const getDependenciesForYarm = async (ctx: Context) => {
+export const getDependenciesForPnpm = async (ctx: Context) => {
   try {
-    const filePath = path.resolve(__dirname, '../../pnpm-lock.yaml') // 获取文件路径
-    const depGraph = new PnpmDepGraph(filePath, 5) // 生成依赖关系
-    ctx.body = depGraph.parse() // 返回依赖关系
+    const { filename, depth } = ctx.request.query
+    console.log(ctx.request.query)
+    console.log(filename, depth, '============================')
+    // const filePath = path.resolve(__dirname, '../../pnpm-lock.yaml') // 获取文件路径
+    const filePath = path.resolve(__dirname, filename as string) // 获取文件路径
+    const depGraph = new PnpmDepGraph(filePath, Number(depth)) // 生成依赖关系
+    ctx.body = depGraph.parse()
     ctx.body = {
       code: 0,
       data: depGraph,

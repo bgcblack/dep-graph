@@ -7,16 +7,7 @@ import type {
 } from 'axios'
 
 import { ElMessage } from 'element-plus'
-// 数据返回的接口
-interface Result {
-  code: number
-  msg: string
-}
 
-// 请求响应参数，包含data
-interface ResultData<T = any> extends Result {
-  data?: T
-}
 const URL = ''
 const TIMEOUT = 20000
 const SUCCESS = 200
@@ -68,9 +59,7 @@ class RequestHttp {
         if (data.code === OVERDUE) {
           // 登录信息失效，应跳转到登录页面，并清空本地的token
           localStorage.setItem('token', '')
-          // router.replace({
-          //   path: '/login'
-          // })
+
           return Promise.reject(data)
         }
         // 全局错误信息拦截（防止下载文件得时候返回数据流，没有code，直接报错）
