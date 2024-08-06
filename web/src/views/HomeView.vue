@@ -19,6 +19,7 @@ const dependencyData = ref<DepGraphNode[]>([])
 
 // 获取依赖关系图数据
 const getDependencyGraph = async (): Promise<DepGraphNode[]> => {
+  // loading 态呢
   const response = await fetch('/api/graph-data')
   dependencyData.value = await response.json()
   return dependencyData.value
