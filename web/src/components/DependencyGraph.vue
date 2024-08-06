@@ -8,6 +8,7 @@ import * as d3 from 'd3'
 import { transformData } from '../utils/utils'
 import {
   type DepGraphNode,
+  // 这两个类型都没用到
   type NodeItem,
   type LinkItem,
   type GraphData,
@@ -22,6 +23,7 @@ const createGraph = (data: GraphData) => {
   const width = 800
   const height = 600
 
+  // D3 好评
   // 清理旧图表
   d3.select(graph.value).selectAll('*').remove()
 
@@ -112,6 +114,7 @@ const drag = () => {
 }
 
 onMounted(() => {
+  // 刚进组件的时候，这个 data 应该是空的吧？上层数据还没 fetch 完
   const graphData = transformData(props.data)
   createGraph(graphData)
 })

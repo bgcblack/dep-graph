@@ -35,6 +35,8 @@ class RequestHttp {
      */
     this.service.interceptors.request.use(
       (config: any) => {
+        // 1. 你这个 case 里面并不需要 token？
+        // 2. 假设需要 token，那应该处理好登录流程
         const token = localStorage.getItem('token') || ''
         return {
           ...config,

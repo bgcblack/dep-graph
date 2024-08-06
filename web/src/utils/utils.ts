@@ -19,6 +19,7 @@ interface GraphData {
   links: LinkItem[]
 }
 
+// 这个 data 是啥玩意儿？
 const data: Dependency[] = [
   {
     name: '@cspotcode/source-map-support',

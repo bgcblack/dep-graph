@@ -2,6 +2,7 @@ import { PnpmDepGraph } from '../graph/pnpm'
 import path from 'path'
 import { type Context } from 'koa'
 
+// 这些 koa 的逻辑还有用吗？
 export const getDependenciesForPnpm = async (ctx: Context) => {
   try {
     const { filename, depth } = ctx.request.query
